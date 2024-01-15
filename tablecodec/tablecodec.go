@@ -31,9 +31,12 @@ import (
 )
 
 var (
-	tablePrefix     = []byte{'t'}
-	recordPrefixSep = []byte("_r")
-	indexPrefixSep  = []byte("_i")
+	tablePrefix        = []byte{'t'}
+	tablePrefixStr     = string(tablePrefix)
+	recordPrefixSep    = []byte("_r")
+	recordPrefixSepStr = string(recordPrefixSep)
+	indexPrefixSep     = []byte("_i")
+	indexPrefixSepStr  = string(indexPrefixSep)
 )
 
 const (
@@ -98,6 +101,31 @@ func DecodeRecordKey(key kv.Key) (tableID int64, handle int64, err error) {
 	 *   5. understanding the coding rules is a prerequisite for implementing this function,
 	 *      you can learn it in the projection 1-2 course documentation.
 	 */
+	if key == nil {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
+	}
+	if len(key) < prefixLen {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
+	}
+	codecTablePrefix := string(key[:tablePrefixLength])
+	if codecTablePrefix != tablePrefixStr {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
+	}
+	key, tableID, err = codec.DecodeInt(key[tablePrefixLength:])
+	if err != nil {
+		return
+	}
+	codecRecordPrefixSep := string(key[:recordPrefixSepLength])
+	if codecRecordPrefixSep != recordPrefixSepStr {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
+	}
+	key, handle, err = codec.DecodeInt(key[recordPrefixSepLength:])
+	if err != nil {
+		return
+	}
+	if len(key) != 0 {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
+	}
 	return
 }
 
@@ -148,6 +176,30 @@ func DecodeIndexKeyPrefix(key kv.Key) (tableID int64, indexID int64, indexValues
 	 *   5. understanding the coding rules is a prerequisite for implementing this function,
 	 *      you can learn it in the projection 1-2 course documentation.
 	 */
+	if key == nil {
+		return 0, 0, nil, errInvalidRecordKey.GenWithStack("invalid index key.")
+	}
+	if len(key) < prefixLen {
+		return 0, 0, nil, errInvalidRecordKey.GenWithStack("invalid index key.")
+	}
+	codecTablePrefix := string(key[:tablePrefixLength])
+	if codecTablePrefix != tablePrefixStr {
+		return 0, 0, nil, errInvalidRecordKey.GenWithStack("invalid index key.")
+	}
+	key = key[tablePrefixLength:]
+	key, tableID, err = codec.DecodeInt(key)
+	if err != nil {
+		return
+	}
+	codecIndexPrefixSep := string(key[:recordPrefixSepLength])
+	if codecIndexPrefixSep != indexPrefixSepStr {
+		return 0, 0, nil, errInvalidRecordKey.GenWithStack("invalid index key.")
+	}
+	key, indexID, err = codec.DecodeInt(key[recordPrefixSepLength:])
+	if err != nil {
+		return
+	}
+	indexValues = key
 	return tableID, indexID, indexValues, nil
 }
 

@@ -3809,6 +3809,16 @@ JoinTable:
 	{
 		$$ = &ast.Join{Left: $1.(ast.ResultSetNode), Right: $3.(ast.ResultSetNode), Tp: ast.CrossJoin}
 	}
+|
+	TableRef JoinType CrossOpt TableRef on Expression %prec tableRefPriority
+	{
+		$$ = &ast.Join {
+			Left: $1.(ast.ResultSetNode),
+			Right: $4.(ast.ResultSetNode),
+			Tp: $2.(ast.JoinType),
+			On: &ast.OnCondition{Expr: $6.(ast.ExprNode)},
+		}
+	}
 	/* Project 2: your code here.
 	 * You can see details about JoinTable in https://dev.mysql.com/doc/refman/8.0/en/join.html
 	 *
