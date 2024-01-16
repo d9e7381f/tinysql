@@ -104,7 +104,7 @@ func DecodeRecordKey(key kv.Key) (tableID int64, handle int64, err error) {
 	if key == nil {
 		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
 	}
-	if len(key) < prefixLen {
+	if len(key) != RecordRowKeyLen {
 		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
 	}
 	codecTablePrefix := string(key[:tablePrefixLength])
@@ -122,9 +122,6 @@ func DecodeRecordKey(key kv.Key) (tableID int64, handle int64, err error) {
 	key, handle, err = codec.DecodeInt(key[recordPrefixSepLength:])
 	if err != nil {
 		return
-	}
-	if len(key) != 0 {
-		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
 	}
 	return
 }
