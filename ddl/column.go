@@ -262,7 +262,7 @@ func onDropColumn(t *meta.Meta, job *model.Job) (ver int64, _ error) {
 		// To be filled
 		colInfo.State = model.StateWriteOnly
 		adjustColumnInfoInDropColumn(tblInfo, colInfo.Offset)
-		if colInfo.DefaultValue == nil {
+		if colInfo.DefaultValue == nil && mysql.HasNotNullFlag(colInfo.Flag) {
 			value, generateErr := generateOriginDefaultValue(colInfo)
 			if generateErr != nil {
 				return 0, generateErr
