@@ -15,7 +15,6 @@ package ddl
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -54,7 +53,6 @@ func (s *testColumnSuite) SetUpSuite(c *C) {
 
 	s.dbInfo = testSchemaInfo(c, s.d, "test_column")
 	testCreateSchema(c, testNewContext(s.d), s.d, s.dbInfo)
-	fmt.Println("done")
 }
 
 func (s *testColumnSuite) TearDownSuite(c *C) {
