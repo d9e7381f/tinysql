@@ -357,15 +357,27 @@ func (p *LogicalProjection) PredicatePushDown(predicates []expression.Expression
 // A simple example is that `select * from (select count(*) from t group by b) tmp_t where b > 1` is the same with
 // `select * from (select count(*) from t where b > 1 group by b) tmp_t.
 // parameters:
-//   predicates: an expression slice which needs to be pushed down as deeply as possible.
+//
+//	predicates: an expression slice which needs to be pushed down as deeply as possible.
+//
 // return values:
-//   ret:     the expressions that can't be pushed.
-//   retPlan: a plan that represents a new root, because it might change the root if the having clause exists
+//
+//	ret:     the expressions that can't be pushed.
+//	retPlan: a plan that represents a new root, because it might change the root if the having clause exists
+//
 // In this function, you need to iterate through list `predicates`, and consider whether each function in it can be pushed down
 // below the current aggregation.
 // Hints:
-//   1. predicates need to be discussed in two types: expression.Constant and expression.ScalarFunction
+//  1. predicates need to be discussed in two types: expression.Constant and expression.ScalarFunction
 func (la *LogicalAggregation) PredicatePushDown(predicates []expression.Expression) (ret []expression.Expression, retPlan LogicalPlan) {
+	children := la.Children()[0].Children()
+	if children != nil {
+		for _, ch := range la.children {
+			selection := ch.(*LogicalSelection)
+			children[0].PredicatePushDown(selection.Conditions)
+		}
+		la.SetChildren(children...)
+	}
 	return predicates, la
 }
 
