@@ -2,7 +2,6 @@ package ddl
 
 import (
 	"context"
-	"fmt"
 	"github.com/pingcap/check"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
@@ -14,9 +13,9 @@ import (
 	"testing"
 )
 
-func TestMyColumn(g *testing.T) {
-	s := new(testColumnSuite)
+func TestAddColumn(g *testing.T) {
 	c := new(check.C)
+	s := new(testColumnSuite)
 	s.store = testCreateStore(c, "test_column")
 	s.d = newDDL(
 		context.Background(),
@@ -26,8 +25,6 @@ func TestMyColumn(g *testing.T) {
 
 	s.dbInfo = testSchemaInfo(c, s.d, "test_column")
 	testCreateSchema(c, testNewContext(s.d), s.d, s.dbInfo)
-
-	fmt.Println("start run test")
 
 	d := newDDL(
 		context.Background(),
@@ -42,8 +39,6 @@ func TestMyColumn(g *testing.T) {
 
 	testCreateTable(c, ctx, d, s.dbInfo, tblInfo)
 	t := testGetTable(c, d, s.dbInfo.ID, tblInfo.ID)
-
-	fmt.Println("create table done.")
 
 	oldRow := types.MakeDatums(int64(1), int64(2), int64(3))
 	handle, err := t.AddRecord(ctx, oldRow)
@@ -108,6 +103,110 @@ func TestMyColumn(g *testing.T) {
 	c.Assert(errors.ErrorStack(hErr), Equals, "")
 	c.Assert(ok, IsTrue)
 
-	//ch := make(chan struct{})
-	//<-ch
+	err = ctx.NewTxn(context.Background())
+	c.Assert(err, IsNil)
+
+	job = testDropTable(c, ctx, d, s.dbInfo, tblInfo)
+	testCheckJobDone(c, d, job, false)
+
+	txn, err = ctx.Txn(true)
+	c.Assert(err, IsNil)
+	err = txn.Commit(context.Background())
+	c.Assert(err, IsNil)
+
+	d.Stop()
+	s.d.start(context.Background(), nil)
+}
+
+func TestDropColumn(g *testing.T) {
+	c := new(check.C)
+	s := new(testColumnSuite)
+	s.store = testCreateStore(c, "test_column")
+	s.d = newDDL(
+		context.Background(),
+		WithStore(s.store),
+		WithLease(testLease),
+	)
+
+	s.dbInfo = testSchemaInfo(c, s.d, "test_column")
+	testCreateSchema(c, testNewContext(s.d), s.d, s.dbInfo)
+
+	d := newDDL(
+		context.Background(),
+		WithStore(s.store),
+		WithLease(testLease),
+	)
+	tblInfo := testTableInfo(c, d, "t", 4)
+	ctx := testNewContext(d)
+
+	err := ctx.NewTxn(context.Background())
+	c.Assert(err, IsNil)
+
+	testCreateTable(c, ctx, d, s.dbInfo, tblInfo)
+	t := testGetTable(c, d, s.dbInfo.ID, tblInfo.ID)
+
+	colName := "c4"
+	defaultColValue := int64(4)
+	row := types.MakeDatums(int64(1), int64(2), int64(3))
+	_, err = t.AddRecord(ctx, append(row, types.NewDatum(defaultColValue)))
+	c.Assert(err, IsNil)
+
+	txn, err := ctx.Txn(true)
+	c.Assert(err, IsNil)
+	err = txn.Commit(context.Background())
+	c.Assert(err, IsNil)
+
+	checkOK := false
+	var hookErr error
+	var mu sync.Mutex
+
+	tc := &TestDDLCallback{}
+	tc.onJobUpdated = func(job *model.Job) {
+		mu.Lock()
+		defer mu.Unlock()
+		if checkOK {
+			return
+		}
+		t, err1 := testGetTableWithError(d, s.dbInfo.ID, tblInfo.ID)
+		if err1 != nil {
+			hookErr = errors.Trace(err1)
+			return
+		}
+		col := table.FindCol(t.(*tables.TableCommon).Columns, colName)
+		if col == nil {
+			checkOK = true
+			return
+		}
+	}
+
+	d.SetHook(tc)
+
+	// Use local ddl for callback test.
+	s.d.Stop()
+
+	d.Stop()
+	d.start(context.Background(), nil)
+
+	job := testDropColumn(c, ctx, s.d, s.dbInfo, tblInfo, colName, false)
+	testCheckJobDone(c, d, job, false)
+	mu.Lock()
+	hErr := hookErr
+	ok := checkOK
+	mu.Unlock()
+	c.Assert(hErr, IsNil)
+	c.Assert(ok, IsTrue)
+
+	err = ctx.NewTxn(context.Background())
+	c.Assert(err, IsNil)
+
+	job = testDropTable(c, ctx, d, s.dbInfo, tblInfo)
+	testCheckJobDone(c, d, job, false)
+
+	txn, err = ctx.Txn(true)
+	c.Assert(err, IsNil)
+	err = txn.Commit(context.Background())
+	c.Assert(err, IsNil)
+
+	d.Stop()
+	s.d.start(context.Background(), nil)
 }

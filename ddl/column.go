@@ -280,7 +280,11 @@ func onDropColumn(t *meta.Meta, job *model.Job) (ver int64, _ error) {
 		ver, err = updateVersionAndTableInfo(t, job, tblInfo, originalState != colInfo.State)
 	case model.StateDeleteReorganization:
 		// To be filled
-		tblInfo.Columns = tblInfo.Columns[0 : len(tblInfo.Columns)-1]
+		newCols := make([]*model.ColumnInfo, 0, len(tblInfo.Columns))
+		newCols = append(newCols, tblInfo.Columns[:colInfo.Offset]...)
+		newCols = append(newCols, tblInfo.Columns[colInfo.Offset+1:]...)
+		tblInfo.Columns = newCols
+
 		colInfo.State = model.StatePublic
 		ver, err = updateVersionAndTableInfo(t, job, tblInfo, originalState != colInfo.State)
 		if err != nil {
